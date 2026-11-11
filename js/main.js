@@ -162,7 +162,7 @@ const Game = {
     panel(g, W / 2 - 110, 280, 360, 124, { fill: 'rgba(12,10,36,0.78)' });
     const lines = IS_TOUCH
       ? ['Use os botões na tela', 'SOCO • KI • CARREGAR • ESPECIAL', 'Explore o mapa e entre no portal!']
-      : ['Setas: andar, pular e defender (← ou ↓)', 'J: soco   K: chute   L: carregar KI', 'U rajada  O teleporte  I onda  P esfera', 'TAB: modo programador   M: som'];
+      : ['Setas: andar • ↑ ou Espaço: pular • ←: defender', 'J: soco   K: chute   L: carregar KI', 'U rajada  O teleporte  I onda  P esfera', 'TAB: modo programador   M: som'];
     lines.forEach((l, i) => text(g, l, W / 2 + 70, 308 + i * 26, { size: 16, color: '#e8e6ff', align: 'center' }));
 
     if (Math.sin(this.t * 5) > -0.2) {

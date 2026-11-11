@@ -189,6 +189,14 @@ const World = {
     this.t = 0;
     this.toast = null;
     this.minimap = buildMinimap(this.map, this.level.theme);
+    // Otimização: o chão inteiro é desenhado UMA vez numa imagem grande; depois só copiamos o pedaço visível
+    this.groundCanvas = document.createElement('canvas');
+    this.groundCanvas.width = MW * TILE;
+    this.groundCanvas.height = MH * TILE;
+    const gg = this.groundCanvas.getContext('2d');
+    for (let ty = 0; ty < MH; ty++) {
+      for (let tx = 0; tx < MW; tx++) this.drawGround(gg, this.map[ty][tx], tx, ty, this.level.theme);
+    }
     FX.clear();
     this.updateCamera(true);
     const n = this.foes().length;
@@ -292,6 +300,7 @@ const World = {
     const ny = p.y + my * speed * dt;
     if (!this.collides(p.x, ny)) p.y = ny;
     p.moving = mx !== 0 || my !== 0;
+    if (p.moving && !swimming && Math.random() < dt * 6) FX.dust(p.x - mx * 8, p.y, 1);
     if (mx) p.facing = Math.sign(mx);
     p.t += dt;
 
@@ -370,10 +379,11 @@ const World = {
 
     // Camada do chão
     const objects = [];
+    g.drawImage(this.groundCanvas, cx, cy, W, H, cx, cy, W, H);
     for (let ty = ty0; ty <= ty1; ty++) {
       for (let tx = tx0; tx <= tx1; tx++) {
         const k = this.map[ty][tx];
-        this.drawGround(g, k, tx, ty, th);
+        if (k === T.WATER) this.drawGround(g, k, tx, ty, th); // só a água se mexe
         if (k === T.TREE || k === T.ROCK) objects.push({ y: ty * TILE + TILE, kind: k, tx, ty });
       }
     }

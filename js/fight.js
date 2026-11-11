@@ -76,6 +76,7 @@ function makeFighter(cfg, isPlayer, x, facing, hp, mult) {
     onGround: true, jumps: 0, guarding: false, lie: 0,
     combo: 0, comboT: 0, superT: 0, transformed: false, chargeHold: 0,
     beamTick: 0, sphereR: 0, sphereThrown: false, atkId: 0, trail: [], trailT: 0, anim: null,
+    faceAnim: facing, squash: 1, dustT: 0, spin: 0, hidden: false, poseOverride: null, victory: false,
     w: 44 * s, h: 118 * s, s,
     speed: isPlayer ? 320 : cfg.speed, mult,
     ai: { t: 0.8, move: 0, moveT: 0, chargeT: 0, guardT: 0, queue: [], seenAtk: -1, last: 'esperando...' },
@@ -125,6 +126,12 @@ const Fight = {
     this.slowmo = 0;
     this.hitStop = 0;
     this.won = false;
+    this.cam = { x: W / 2, y: H / 2, z: 1 };
+    this.camT = { x: W / 2, y: H / 2, z: 1 };
+    this.bars = 0;
+    this.flashA = 0;
+    this.finBanner = null;
+    Fin.reset();
     FX.clear();
   },
 
@@ -132,7 +139,7 @@ const Fight = {
   playerControl() {
     return {
       move: (Input.held('right') ? 1 : 0) - (Input.held('left') ? 1 : 0),
-      jump: Input.tapped('up'),
+      jump: Input.tapped('up') || Input.tapped('jump'),
       punch: Input.tapped('punch'),
       kick: Input.tapped('kick'),
       blast: Input.tapped('blast'),
@@ -312,7 +319,7 @@ const Fight = {
     FX.burst(f.x, f.y - 60, f.isPlayer ? '#ffe14d' : f.cfg.aura, 40, 500, 5, 0);
     FX.pop(f.x, f.y - f.h - 50, f.isPlayer ? 'MODO SUPER!' : 'FORMA FINAL!', '#ffe14d', 44);
     FX.shake = 16;
-    this.hitStop = 0.15;
+    this.hitStop = 0.08;
     Sound.play('transform');
   },
 
@@ -345,7 +352,7 @@ const Fight = {
         if (Math.random() < 0.4) FX.pop(tgt.x, tgt.y - tgt.h - 20, 'DEFESA!', '#7ef9ff', 22);
         Sound.play('block');
       }
-      this.hitStop = Math.max(this.hitStop, 0.04);
+      this.hitStop = Math.max(this.hitStop, 0.025);
       return true;
     }
 
@@ -389,8 +396,12 @@ const Fight = {
       Sound.play(heavy ? 'heavy' : 'hit');
     }
     FX.shake = Math.max(FX.shake, heavy ? 14 : o.kind === 'beam' ? 4 : 7);
-    this.hitStop = Math.max(this.hitStop, heavy ? 0.12 : o.kind === 'beam' ? 0 : 0.06);
+    this.hitStop = Math.max(this.hitStop, heavy ? 0.07 : o.kind === 'beam' ? 0 : 0.035);
 
+    if (tgt.hp <= 0 && !tgt.isPlayer && this.phase === 'fight') {
+      this.startFinisher();
+      return true;
+    }
     if (tgt.hp <= 0) {
       this.setState(tgt, 'ko');
       tgt.vy = -680;
@@ -526,7 +537,7 @@ const Fight = {
         break;
     }
 
-    if (!wasOnGround && f.onGround && f.state !== 'ko' && f.state !== 'down') FX.dust(f.x, GROUND_Y, 5);
+    if (!wasOnGround && f.onGround && f.state !== 'ko' && f.state !== 'down') { FX.dust(f.x, GROUND_Y, 5); f.squash = 0.84; }
     if (f.state !== 'charge' && f.state !== 'beam' && f.state !== 'sphere') f.ki = Math.min(100, f.ki + (f.superT > 0 ? 9 : 4) * dt);
     this.updateAnim(f, opp, dt);
   },
@@ -555,6 +566,8 @@ const Fight = {
     if (c.guard && f.onGround) { f.vx = 0; if (f.state !== 'guard') this.setState(f, 'guard'); }
     else {
       f.vx = c.move * sp;
+      f.dustT -= dt;
+      if (c.move && f.onGround && f.dustT <= 0) { f.dustT = 0.22; FX.dust(f.x - c.move * 14, GROUND_Y, 2); }
       const ns = !f.onGround ? 'jump' : c.move ? 'walk' : 'idle';
       if (ns !== f.state) this.setState(f, ns);
     }
@@ -564,6 +577,7 @@ const Fight = {
       f.onGround = false;
       f.guarding = false;
       this.setState(f, 'jump');
+      f.squash = 1.14;
       Sound.play('jump');
       if (f.jumps === 1) FX.dust(f.x, f.y, 5);
       else FX.ring(f.x, f.y, '#ffffff', 40, 0.25);
@@ -624,6 +638,8 @@ const Fight = {
   /* ---------- Animação: escolhe a pose-alvo e suaviza ---------- */
   targetPose(f, opp) {
     const t = f.t;
+    if (f.poseOverride) return f.poseOverride;
+    if (f.victory) return POSES.win(t);
     switch (f.state) {
       case 'attack': {
         const m = f.move;
@@ -655,6 +671,8 @@ const Fight = {
   },
 
   updateAnim(f, opp, dt) {
+    f.faceAnim = f.spinTurn ? Math.cos(f.t * 28) : lerp(f.faceAnim, f.facing, Math.min(1, dt * 22));
+    f.squash = lerp(f.squash, 1, Math.min(1, dt * 12));
     const target = this.targetPose(f, opp);
     const fast = f.state === 'attack' || f.state === 'hurt' || f.state === 'block' || f.state === 'tpprep';
     // No instante do golpe a pose "estala" direto para a extensão máxima
@@ -665,7 +683,7 @@ const Fight = {
 
     // Rastro de "imagens fantasmas" nos movimentos rápidos
     f.trailT -= dt;
-    const fastMove = (f.state === 'attack' && f.move && f.st >= f.move.wind) || (f.state === 'launched' && Math.abs(f.vx) > 250) || (f.superT > 0 && f.state === 'walk');
+    const fastMove = f.fxTrail || (f.state === 'attack' && f.move && f.st >= f.move.wind) || (f.state === 'launched' && Math.abs(f.vx) > 250) || (f.superT > 0 && f.state === 'walk');
     if (fastMove && f.trailT <= 0) {
       f.trailT = 0.03;
       f.trail.push({ x: f.x, y: f.y, facing: f.facing, joints: clonePose(f.anim), life: 0.16 });
@@ -760,9 +778,61 @@ const Fight = {
     this.shots = this.shots.filter((s) => !s.dead);
   },
 
+  startFinisher() {
+    this.phase = 'finisher';
+    this.phaseT = 0;
+    this.shots = [];
+    this.slowmo = 0;
+    this.hitStop = 0.14;
+    for (const f of [this.p, this.e]) { f.trail = []; f.move = null; f.vx = 0; f.vy = 0; f.sphereR = 0; f.inv = 0; }
+    this.p.combo = 0;
+    Fin.start(FINISHERS[this.e.cfg.name] || FINISHERS.default);
+  },
+
+  endFinisher() {
+    const p = this.p;
+    const e = this.e;
+    this.phase = 'ko';
+    this.phaseT = 0;
+    this.won = true;
+    p.poseOverride = null;
+    p.victory = true;
+    p.fxTrail = false;
+    p.spinTurn = false;
+    p.hidden = false;
+    this.setState(p, 'idle');
+    e.poseOverride = null;
+    e.spin = 0;
+    if (!e.hidden) { this.setState(e, 'ko'); e.y = GROUND_Y; e.onGround = true; e.vx = 0; e.vy = 0; }
+  },
+
+  updateCam(dt) {
+    const tg = this.phase === 'finisher' ? this.camT : { x: W / 2, y: H / 2, z: 1 };
+    const c = this.cam;
+    c.z = lerp(c.z, tg.z, Math.min(1, dt * 5));
+    const hw = W / (2 * c.z);
+    const hh = H / (2 * c.z);
+    c.x = clamp(lerp(c.x, tg.x, Math.min(1, dt * 6)), hw, W - hw);
+    c.y = clamp(lerp(c.y, tg.y, Math.min(1, dt * 6)), hh, H - hh);
+    this.bars = lerp(this.bars, this.phase === 'finisher' ? 1 : 0, Math.min(1, dt * 6));
+    this.flashA = Math.max(0, this.flashA - dt * 2.2);
+  },
+
   update(dt) {
     FX.update(dt);
+    this.updateCam(dt);
     if (this.hitStop > 0) { this.hitStop -= dt; return; } // "congela" um instante no impacto
+    if (this.phase === 'finisher') {
+      this.t += dt;
+      Fin.update(dt);
+      for (const f of [this.p, this.e]) {
+        f.t += dt;
+        f.flash = Math.max(0, f.flash - dt);
+        f.comboT -= dt;
+        this.updateAnim(f, f === this.p ? this.e : this.p, dt);
+      }
+      return;
+    }
     if (this.slowmo > 0) { this.slowmo -= dt; dt *= 0.35; }
     this.t += dt;
     this.phaseT += dt;
@@ -809,24 +879,62 @@ const Fight = {
   draw(g) {
     g.save();
     if (FX.shake > 0) g.translate(rand(-FX.shake, FX.shake), rand(-FX.shake, FX.shake));
+    const c = this.cam;
+    g.translate(W / 2, H / 2);
+    g.scale(c.z, c.z);
+    g.translate(-c.x, -c.y);
     drawArenaBg(g, this.level.theme, this.level.seed, this.t, GROUND_Y);
+    if (Fin.dark > 0.01) { g.fillStyle = 'rgba(5,3,25,' + Fin.dark + ')'; g.fillRect(-50, -50, W + 100, H + 100); }
+    Fin.drawBack(g);
 
     for (const f of [this.p, this.e]) this.drawShadow(g, f);
-    const order = this.p.state === 'attack' ? [this.e, this.p] : [this.p, this.e];
+    const order = this.p.state === 'attack' || this.p.state === 'finisher' ? [this.e, this.p] : [this.p, this.e];
     for (const f of order) this.drawFighter(g, f);
     for (const f of [this.p, this.e]) this.drawBeam(g, f, f === this.p ? this.e : this.p);
     this.drawShots(g);
+    Fin.drawFront(g);
 
     FX.draw(g);
     if (Game.debug) this.drawDebug(g);
     g.restore();
 
-    this.drawHud(g);
+    if (this.bars < 0.95) {
+      g.globalAlpha = 1 - this.bars;
+      this.drawHud(g);
+      g.globalAlpha = 1;
+    }
     this.drawPhaseText(g);
+    this.drawCinema(g);
+  },
+
+  // Faixas pretas de cinema + nome da finalização + clarão branco
+  drawCinema(g) {
+    if (this.bars > 0.01) {
+      const b = this.bars * 64;
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, W, b);
+      g.fillRect(0, H - b, W, b);
+      const fb = this.finBanner;
+      if (fb && this.phase === 'finisher') {
+        const sc = 1 + Math.max(0, 0.25 - Fin.total) * 3;
+        g.globalAlpha = this.bars;
+        text(g, 'FINALIZAÇÃO ESPECIAL', W / 2, b - 38, { size: 16, color: '#ffffff', align: 'center' });
+        g.save();
+        g.translate(W / 2, H - b + 34);
+        g.scale(sc, sc);
+        text(g, fb.text, 0, 0, { size: 40, color: fb.color, align: 'center', base: 'middle', font: FONT_TITLE, weight: '400', stroke: '#1b1030', lw: 8 });
+        g.restore();
+        g.globalAlpha = 1;
+      }
+    }
+    if (this.flashA > 0) {
+      g.fillStyle = 'rgba(255,255,255,' + Math.min(1, this.flashA) + ')';
+      g.fillRect(0, 0, W, H);
+    }
   },
 
   drawShadow(g, f) {
-    if (f.state === 'vanish') return;
+    if (f.state === 'vanish' || f.hidden) return;
     const k = clamp(1 - (GROUND_Y - f.y) / 400, 0.3, 1);
     g.fillStyle = `rgba(0,0,0,${0.3 * k})`;
     g.beginPath();
@@ -839,25 +947,38 @@ const Fight = {
     const myAura = f.isPlayer && superMode ? '#ffe14d' : f.cfg.aura;
     let aura = null;
     if (f.state === 'charge' || f.state === 'beam' || f.state === 'transform' || f.state === 'sphere' || superMode) aura = myAura;
+    if (f.finAura) aura = superMode ? '#ffe14d' : f.finAura;
     let face = 'normal';
     if (f.state === 'hurt' || f.state === 'launched' || f.state === 'down' || f.state === 'ko') face = 'hurt';
-    else if (['attack', 'beam', 'charge', 'transform', 'sphere', 'blast'].includes(f.state)) face = 'shout';
+    else if (['attack', 'beam', 'charge', 'transform', 'sphere', 'blast', 'finisher'].includes(f.state)) face = 'shout';
     let bigFist = null;
     if (f.state === 'attack' && f.move && f.move.kind === 'punch' && f.st >= f.move.wind) bigFist = f.move.limb;
     return { superMode, aura, face, bigFist };
   },
 
   drawFighter(g, f) {
-    if (f.state === 'vanish' || !f.anim) return;
+    if (f.state === 'vanish' || f.hidden || !f.anim) return;
     const look = this.fighterLook(f);
-    for (const tr of f.trail) {
-      drawCharacter(g, f.cfg, tr.x, tr.y, { facing: tr.facing, joints: tr.joints, t: f.t, super: look.superMode, alpha: 0.3 * (tr.life / 0.16), flash: true });
+    if (f.spin) {
+      // girando no ar (finalizações)
+      g.save();
+      g.translate(f.x, f.y - 55 * f.s);
+      g.rotate(f.spin * f.facing);
+      g.translate(-f.x, -(f.y - 55 * f.s));
     }
-    drawCharacter(g, f.cfg, f.x, f.y, {
-      facing: f.facing, joints: f.anim, t: f.t, aura: look.aura, auraBig: f.state === 'transform' ? 1.4 : 1,
+    const trailColor = f.isPlayer ? (look.superMode ? '#ffe14d' : '#7ef9ff') : f.cfg.aura;
+    for (const tr of f.trail) {
+      drawCharacter(g, f.cfg, tr.x, tr.y, { facing: tr.facing, joints: tr.joints, t: f.t, alpha: 0.35 * (tr.life / 0.16), tint: trailColor });
+    }
+    // virada suave: o personagem "gira" em vez de trocar de lado de repente
+    const turn = Math.abs(f.faceAnim) < 0.25 ? Math.sign(f.faceAnim || f.facing) * 0.25 : f.faceAnim;
+    const shake = (f.state === 'hurt' || f.state === 'block') && f.hurtT > 0.08 ? rand(-2.5, 2.5) : 0;
+    drawCharacter(g, f.cfg, f.x + shake, f.y, {
+      facing: turn, squash: f.squash, joints: f.anim, t: f.t, aura: look.aura, auraBig: f.state === 'transform' ? 1.4 : 1,
       super: look.superMode, flash: f.flash > 0, lie: f.lie, face: look.face, bigFist: look.bigFist,
       alpha: f.inv > 0 && (f.state === 'getup' || f.state === 'down') ? 0.6 + Math.sin(f.t * 40) * 0.3 : undefined,
     });
+    if (f.spin) g.restore();
 
     // Rastro do golpe (arco do chute / linha do soco)
     if (f.state === 'attack' && f.move && f.st >= f.move.wind && f.st < f.move.wind + f.move.act) {
@@ -1015,7 +1136,7 @@ const Fight = {
     text(g, 'VS', W / 2, 62, { size: 20, color: '#fff', align: 'center', font: FONT_TITLE, weight: '400', stroke: '#1b1030', lw: 5 });
 
     if (!IS_TOUCH && (this.phase === 'fight' || this.phase === 'intro')) {
-      const hint = '←→ andar • segure ← ou ↓ defender • ↑ pular • J soco • K chute • L carregar • U O I P especiais • TAB programador';
+      const hint = '←→ andar • segure ← ou ↓ defender • ↑ ou Espaço pular • J soco • K chute • L carregar • U O I P especiais • TAB programador';
       g.font = `900 12px ${FONT_BODY}`;
       const w = g.measureText(hint).width + 24;
       panel(g, W / 2 - w / 2, H - 32, w, 24, { r: 12, fill: 'rgba(12,10,36,0.6)' });

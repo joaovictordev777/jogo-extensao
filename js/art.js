@@ -49,18 +49,46 @@ function box(g, x, y, w, h, r, color) {
   g.stroke();
 }
 
+// Otimização: cada cor de brilho é desenhada UMA vez numa imagem e depois só copiada (muito mais rápido)
+const glowCache = new Map();
+function glowSprite(color) {
+  let c = glowCache.get(color);
+  if (!c) {
+    c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const gg = c.getContext('2d');
+    const grd = gg.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grd.addColorStop(0, '#ffffff');
+    grd.addColorStop(0.35, color);
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    gg.fillStyle = grd;
+    gg.fillRect(0, 0, 128, 128);
+    glowCache.set(color, c);
+  }
+  return c;
+}
+
 function glow(g, x, y, r, color) {
-  g.save();
+  if (r <= 0) return;
+  const prev = g.globalCompositeOperation;
   g.globalCompositeOperation = 'lighter';
-  const grd = g.createRadialGradient(x, y, 0, x, y, r);
-  grd.addColorStop(0, '#ffffff');
-  grd.addColorStop(0.35, color);
-  grd.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = grd;
-  g.beginPath();
-  g.arc(x, y, r, 0, Math.PI * 2);
-  g.fill();
-  g.restore();
+  g.drawImage(glowSprite(color), x - r, y - r, r * 2, r * 2);
+  g.globalCompositeOperation = prev;
+}
+
+// Versão "pintada" de um personagem (flash branco do golpe e rastro colorido), sem filtros pesados
+const COLOR_KEYS = ['skin', 'gi', 'shirt', 'sleeve', 'pants', 'belt', 'wrist', 'boots', 'glove', 'hairColor', 'armor', 'pads', 'cape', 'beard', 'scouter'];
+const tintCache = new WeakMap();
+function tintCfg(cfg, color) {
+  let m = tintCache.get(cfg);
+  if (!m) { m = new Map(); tintCache.set(cfg, m); }
+  let t = m.get(color);
+  if (!t) {
+    t = { ...cfg };
+    for (const k of COLOR_KEYS) if (t[k]) t[k] = color;
+    m.set(color, t);
+  }
+  return t;
 }
 
 /* ---------- Esqueleto animado ----------
@@ -69,23 +97,23 @@ function glow(g, x, y, r, color) {
    Braços e pernas são calculados com "cinemática inversa": o código descobre
    sozinho onde dobrar o cotovelo e o joelho para a mão/pé chegar no alvo! */
 
-const GUARD = { fh: [24, -76], bh: [12, -70], ff: [14, 0], bf: [-14, 0], lean: 0.06, crouch: 4 };
+const GUARD = { fh: [24, -84], bh: [12, -78], ff: [12, 0], bf: [-12, 0], lean: 0.04, crouch: 1 };
 
 const POSES = {
-  idle: (t) => ({ ...GUARD, crouch: 4 + Math.sin(t * 5) * 1.5, fh: [24, -76 + Math.sin(t * 5) * 1.5] }),
+  idle: (t) => ({ ...GUARD, crouch: 1 + Math.sin(t * 5) * 1, fh: [24, -84 + Math.sin(t * 5) * 1.5] }),
   walk: (t, dir = 1) => {
     const s = Math.sin(t * 13);
     const c = Math.cos(t * 13);
     return {
-      fh: [22 + s * 5, -74], bh: [10 - s * 5, -68],
+      fh: [20 + s * 6, -80], bh: [8 - s * 6, -76],
       ff: [10 + s * 15, -Math.max(0, c) * 9], bf: [-10 - s * 15, -Math.max(0, -c) * 9],
-      lean: dir > 0 ? 0.16 : -0.06, crouch: 3 + Math.abs(c) * 3,
+      lean: dir > 0 ? 0.08 : -0.04, crouch: Math.abs(c) * 2,
     };
   },
   jump: () => ({ fh: [26, -100], bh: [-22, -96], ff: [18, -26], bf: [-8, -12], lean: 0, crouch: 0 }),
   fall: () => ({ fh: [30, -88], bh: [-26, -90], ff: [12, -6], bf: [-12, -2], lean: -0.05, crouch: 0 }),
-  charge: (t) => ({ fh: [26, -46], bh: [-26, -46], ff: [24, 0], bf: [-24, 0], lean: -0.06, crouch: 12 + Math.sin(t * 30) * 1.5 }),
-  block: () => ({ fh: [22, -94], bh: [26, -82], ff: [14, 0], bf: [-20, 0], lean: -0.12, crouch: 8 }),
+  charge: (t) => ({ fh: [28, -54], bh: [-28, -54], ff: [20, 0], bf: [-20, 0], lean: -0.04, crouch: 5 + Math.sin(t * 30) * 1 }),
+  block: () => ({ fh: [22, -100], bh: [26, -88], ff: [14, 0], bf: [-18, 0], lean: -0.12, crouch: 5 }),
   hurt: () => ({ fh: [-6, -60], bh: [-30, -78], ff: [8, 0], bf: [-18, 0], lean: -0.42, crouch: 6 }),
   launched: (t) => ({ fh: [12 + Math.sin(t * 20) * 8, -112], bh: [-30, -102], ff: [26, -22], bf: [6, -10], lean: -0.6, crouch: 0 }),
   lying: () => ({ fh: [22, -58], bh: [-22, -56], ff: [12, 0], bf: [-12, 0], lean: 0, crouch: 0 }),
@@ -94,9 +122,9 @@ const POSES = {
   beamFire: () => ({ fh: [54, -66], bh: [50, -62], ff: [26, 0], bf: [-30, 0], lean: 0.24, crouch: 10 }),
   sphereHold: () => ({ fh: [8, -150], bh: [-8, -150], ff: [18, 0], bf: [-18, 0], lean: -0.08, crouch: 2 }),
   sphereThrow: () => ({ fh: [58, -98], bh: [52, -92], ff: [24, 0], bf: [-26, 0], lean: 0.38, crouch: 6 }),
-  teleport: () => ({ fh: [16, -112], bh: [10, -66], ff: [10, 0], bf: [-10, 0], lean: 0, crouch: 2 }),
+  teleport: () => ({ fh: [16, -118], bh: [10, -74], ff: [10, 0], bf: [-10, 0], lean: 0, crouch: 0 }),
   blast: () => ({ fh: [58, -78], bh: [0, -66], ff: [22, 0], bf: [-22, 0], lean: 0.22, crouch: 6 }),
-  win: (t) => ({ fh: [16, -146], bh: [-14, -64], ff: [12, 0], bf: [-12, 0], lean: -0.05, crouch: 2 + Math.sin(t * 4) }),
+  win: (t) => ({ fh: [16, -150], bh: [-14, -72], ff: [12, 0], bf: [-12, 0], lean: -0.05, crouch: 1 + Math.sin(t * 4) }),
 };
 
 function mergePose(base, over) { return over ? { ...base, ...over } : base; }
@@ -147,7 +175,7 @@ function drawArm(g, sx, sy, hand, cfg, big) {
 }
 
 function drawLeg(g, hx, hy, foot, cfg, pants) {
-  const k = ik2(hx, hy, foot[0], foot[1] - 8, 24, 24, -1);
+  const k = ik2(hx, hy, foot[0], foot[1] - 8, 22.5, 22.5, -1);
   limb(g, hx, hy, k.ex, k.ey, 16, pants);
   limb(g, k.ex, k.ey, k.bx, k.by, 14, pants);
   const ang = Math.atan2(k.by - k.ey, k.bx - k.ex);
@@ -195,28 +223,29 @@ function drawLightning(g, t) {
  * Desenha um lutador.
  * o: { facing, scale, pose ou joints, t, aura, super, flash, alpha, lie (0..1), face, bigFist }
  */
-function drawCharacter(g, cfg, x, y, o = {}) {
+function drawCharacter(g, cfg0, x, y, o = {}) {
+  const cfg = o.flash ? tintCfg(cfg0, '#ffffff') : o.tint ? tintCfg(cfg0, o.tint) : cfg0;
   const s = (o.scale || 1) * (cfg.scale || 1);
   const facing = o.facing || 1;
   const t = o.t || 0;
   const J = o.joints || (POSES[o.pose] || POSES.idle)(t, 1);
   const superMode = !!o.super;
   const isSpiky = cfg.hair === 'spiky';
-  const hairColor = superMode && isSpiky ? '#ffe14d' : cfg.hairColor;
+  const hairColor = superMode && isSpiky && !o.flash && !o.tint ? '#ffe14d' : cfg.hairColor;
   const pants = cfg.pants || cfg.gi;
   const face = o.face || (o.pose === 'hurt' ? 'hurt' : o.pose === 'charge' ? 'shout' : 'normal');
 
   g.save();
   g.translate(x, y);
-  g.scale(facing * s, s);
+  const sy = o.squash || 1;
+  g.scale(facing * s * (2 - sy), s * sy);
   if (o.alpha !== undefined) g.globalAlpha = o.alpha;
-  if (o.flash) g.filter = 'brightness(2.6)';
   if (o.aura) drawAura(g, t, o.aura, o.auraBig || 1);
 
   const lie = o.lie || 0;
   if (lie > 0) { g.translate(0, -14 * lie); g.rotate((-Math.PI / 2) * lie); }
 
-  const hipY = -44 + (J.crouch || 0);
+  const hipY = -52 + (J.crouch || 0);
   const a = J.lean || 0;
   const ca = Math.cos(a);
   const sa = Math.sin(a);
@@ -300,8 +329,7 @@ function drawCharacter(g, cfg, x, y, o = {}) {
 
   drawArm(g, shF[0], shF[1], J.fh, cfg, o.bigFist === 'fh');
 
-  if (superMode) drawLightning(g, t);
-  g.filter = 'none';
+  if (superMode && !o.tint) drawLightning(g, t);
   g.restore();
 }
 
@@ -389,7 +417,49 @@ function fillMountains(g, pts, color) {
   g.fill();
 }
 
+const bgLayerCache = new Map();
 function drawArenaBg(g, theme, seed, t, groundY = 462) {
+  const key = seed + ':' + groundY;
+  let layer = bgLayerCache.get(key);
+  if (!layer) {
+    layer = document.createElement('canvas');
+    layer.width = W;
+    layer.height = H;
+    drawArenaStatic(layer.getContext('2d'), theme, seed, groundY);
+    bgLayerCache.set(key, layer);
+  }
+  g.drawImage(layer, 0, 0);
+  const d = getBgData(seed);
+  if (theme.deco === 'stars') {
+    g.fillStyle = '#fff';
+    for (const [x, y, r, ph] of d.stars) {
+      if (y > 200) continue;
+      g.globalAlpha = 0.5 + Math.sin(t * 3 + ph) * 0.5;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    g.globalAlpha = 1;
+  } else if (theme.deco !== 'snow') {
+    g.fillStyle = 'rgba(255,255,255,0.75)';
+    for (const [cx, cy, k] of d.clouds) {
+      const x = ((cx + t * 12 * k) % (W + 200)) - 100;
+      g.beginPath();
+      g.ellipse(x, cy, 50 * k, 16 * k, 0, 0, Math.PI * 2);
+      g.ellipse(x + 30 * k, cy - 10 * k, 30 * k, 16 * k, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  if (theme.deco === 'snow') {
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    for (let i = 0; i < 60; i++) {
+      const x = (hash2(i, 1) * W + Math.sin(t + i) * 20 + W) % W;
+      const y = (hash2(i, 2) * H + t * (30 + hash2(i, 3) * 50)) % H;
+      const r = 1.5 + hash2(i, 4) * 2;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+  }
+}
+
+function drawArenaStatic(g, theme, seed, groundY) {
   const d = getBgData(seed);
   const sky = g.createLinearGradient(0, 0, 0, groundY);
   sky.addColorStop(0, theme.sky[0]);
@@ -397,9 +467,9 @@ function drawArenaBg(g, theme, seed, t, groundY = 462) {
   g.fillStyle = sky;
   g.fillRect(0, 0, W, H);
 
-  if (theme.deco === 'stars' || theme.deco === 'snow') {
-    for (const [x, y, r, ph] of d.stars) {
-      g.globalAlpha = theme.deco === 'stars' ? 0.5 + Math.sin(t * 3 + ph) * 0.5 : 0.25;
+  if (theme.deco === 'snow') {
+    for (const [x, y, r] of d.stars) {
+      g.globalAlpha = 0.25;
       g.fillStyle = '#fff';
       g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
     }
@@ -415,14 +485,6 @@ function drawArenaBg(g, theme, seed, t, groundY = 462) {
     glow(g, 790, 110, 110, theme.deco === 'snow' ? 'rgba(255,255,255,0.6)' : 'rgba(255,220,120,0.8)');
     g.fillStyle = theme.deco === 'snow' ? '#f4f8ff' : '#fff3c4';
     g.beginPath(); g.arc(790, 110, 42, 0, Math.PI * 2); g.fill();
-    g.fillStyle = 'rgba(255,255,255,0.75)';
-    for (const [cx, cy, k] of d.clouds) {
-      const x = ((cx + t * 12 * k) % (W + 200)) - 100;
-      g.beginPath();
-      g.ellipse(x, cy, 50 * k, 16 * k, 0, 0, Math.PI * 2);
-      g.ellipse(x + 30 * k, cy - 10 * k, 30 * k, 16 * k, 0, 0, Math.PI * 2);
-      g.fill();
-    }
   }
 
   fillMountains(g, d.far, theme.mount[0]);
@@ -443,15 +505,6 @@ function drawArenaBg(g, theme, seed, t, groundY = 462) {
   }
   for (const yy of [490, 515]) {
     g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke();
-  }
-
-  if (theme.deco === 'snow') {
-    g.fillStyle = 'rgba(255,255,255,0.9)';
-    for (let i = 0; i < 60; i++) {
-      const x = (hash2(i, 1) * W + Math.sin(t + i) * 20 + W) % W;
-      const y = (hash2(i, 2) * H + t * (30 + hash2(i, 3) * 50)) % H;
-      g.beginPath(); g.arc(x, y, 1.5 + hash2(i, 4) * 2, 0, Math.PI * 2); g.fill();
-    }
   }
 }
 

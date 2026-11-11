@@ -93,7 +93,7 @@ function wrapLines(g, str, maxW) {
 
 function roundRect(g, x, y, w, h, r) {
   g.beginPath();
-  if (g.roundRect) g.roundRect(x, y, w, h, r);
+  if (g.roundRect) g.roundRect(x, y, Math.max(0, w), Math.max(0, h), Math.max(0, Math.min(r, w / 2, h / 2)));
   else g.rect(x, y, w, h);
 }
 
@@ -113,7 +113,7 @@ const KEYMAP = {
   ArrowRight: ['right'], KeyD: ['right'],
   ArrowUp: ['up'], KeyW: ['up'],
   ArrowDown: ['down'], KeyS: ['down'],
-  KeyJ: ['punch'], Space: ['punch', 'confirm'],
+  KeyJ: ['punch'], Space: ['jump', 'confirm'],
   KeyK: ['kick'], KeyL: ['charge'],
   KeyU: ['blast'], KeyI: ['beam'], KeyO: ['teleport'], KeyP: ['sphere'],
   Enter: ['confirm'], KeyE: ['confirm'],
@@ -260,6 +260,8 @@ const Sound = {
       case 'sphere': this.tone(90, 1.3, { type: 'sawtooth', to: 360, vol: 0.08 }); this.tone(180, 1.3, { type: 'sine', to: 720, vol: 0.06 }); break;
       case 'boom': this.noise(0.6, 0.45); this.tone(80, 0.6, { type: 'sawtooth', to: 30, vol: 0.2 }); break;
       case 'transform': this.tone(150, 0.9, { type: 'sawtooth', to: 900, vol: 0.1 }); this.noise(0.8, 0.2); break;
+      case 'ping': [1800, 2400].forEach((f, i) => this.tone(f, 0.18, { type: 'triangle', vol: 0.12, delay: i * 0.09 })); break;
+      case 'zap': this.noise(0.18, 0.3); this.tone(1600, 0.18, { type: 'sawtooth', to: 200, vol: 0.08 }); break;
       case 'clash': this.noise(0.25, 0.25); this.tone(900, 0.2, { type: 'square', to: 300, vol: 0.06 }); break;
       default: break;
     }

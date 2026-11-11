@@ -11,9 +11,9 @@ Jogo de luta 2D estilo anime feito **100% com programação** (HTML + CSS + Java
 
 | Tecla | Ação |
 |---|---|
-| Setas / WASD | Andar · ↑ pular (pulo duplo) |
+| Setas / WASD | Andar · ↑ ou **Espaço** pular (pulo duplo) |
 | Segurar ← (para trás) ou ↓ | **Defender** |
-| J ou Espaço | **Soco** (aperte 3x: jab, direto, gancho que arremessa) |
+| J | **Soco** (aperte 3x: jab, direto, gancho que arremessa) |
 | K | **Chute** (3x: baixo, alto, giratório; no ar: chute voador) |
 | J/K misturados | **Combos** (o contador "HITS!" aparece na tela) |
 | L (segurar) | Carregar KI · com KI cheio, continue segurando: **Modo Super** (cabelo dourado, +30% de força por 14s) |
@@ -24,6 +24,8 @@ Jogo de luta 2D estilo anime feito **100% com programação** (HTML + CSS + Java
 | E / Enter | Conversar · ler placa · entrar na arena |
 | **TAB** | **Modo Programador**: caixas de colisão, golpes, estados e o que a IA está "pensando" |
 | M | Liga/desliga o som |
+
+**Finalizações especiais:** o golpe que derrota cada inimigo vira uma cena de cinema, com câmera, faixas pretas e o nome do golpe. São 13 finalizações diferentes, uma por inimigo (Voadora Meteoro, Rajada de Mil Socos, Onda Estelar Máxima, Tornado Giratório, Martelo do Céu, Esfera Solar Suprema, Clones Fantasmas, Chuva de Ki, Trovão Supremo, Dragão de Energia, Erupção Estelar, Combo Infinito e Super Onda Estelar Final). Elas ficam em `js/finisher.js`, montadas como um roteiro de passos.
 
 Os inimigos também defendem, desviam, fazem combos, se teleportam, usam a onda e, quando a vida cai pela metade, viram a **FORMA FINAL**. Para ajustar a dificuldade, mude `hp`, `dmg`, `think` e `skill` em `js/data.js`.
 
@@ -39,6 +41,7 @@ js/art.js       desenho dos personagens, cenários e objetos
 js/data.js      personagens, fases e curiosidades (ótimo para editar ao vivo!)
 js/world.js     mapa gerado por algoritmo, colisão, diálogos, minimapa
 js/fight.js     física, golpes, rajadas, raio especial e IA dos inimigos
+js/finisher.js  finalizações cinematográficas (uma por inimigo)
 js/main.js      telas e o game loop
 ```
 
