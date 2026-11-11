@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Guerreiros do Código</title>
+  <meta name="description" content="Um jogo de luta 2D feito 100% com programação (HTML, CSS e JavaScript) para mostrar às crianças o que o código pode fazer.">
+  <meta name="theme-color" content="#0b0726">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="wrap">
+    <canvas id="game" width="960" height="540" aria-label="Jogo Guerreiros do Código"></canvas>
+  </main>
+
+  <!-- Controles de toque (aparecem só em celular/tablet) -->
+  <div id="touch" hidden>
+    <div class="dpad">
+      <button class="tbtn up" data-action="up" aria-label="Cima">▲</button>
+      <button class="tbtn left" data-action="left" aria-label="Esquerda">◀</button>
+      <button class="tbtn right" data-action="right" aria-label="Direita">▶</button>
+      <button class="tbtn down" data-action="down" aria-label="Baixo">▼</button>
+    </div>
+    <div class="actions">
+      <button class="tbtn act a" data-action="punch confirm">SOCO<br><small>OK</small></button>
+      <button class="tbtn act b" data-action="blast">KI</button>
+      <button class="tbtn act c" data-action="charge">CARREGAR</button>
+      <button class="tbtn act d" data-action="special">ESPECIAL</button>
+    </div>
+  </div>
+
+  <div id="rotate">Gire o celular para jogar 🔄</div>
+
+  <!-- Ordem importa: cada arquivo usa o que foi definido antes -->
+  <script src="js/core.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/fight.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

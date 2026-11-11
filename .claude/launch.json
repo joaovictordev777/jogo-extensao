@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jogo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:\\Users\\Black\\AppData\\Local\\Temp\\claude\\df34e83c2481b5db\\6d2ab1a7-2bd1-4d07-a08d-d61c95202bfa\\scratchpad\\serve.js", "C:\\Users\\Black\\OneDrive\\Desktop\\apresentação hoje", "5173"],
+      "port": 5173
+    }
+  ]
+}
