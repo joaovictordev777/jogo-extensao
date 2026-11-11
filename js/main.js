@@ -150,7 +150,7 @@ const Game = {
     // Herói carregando energia
     g.fillStyle = 'rgba(0,0,0,0.3)';
     g.beginPath(); g.ellipse(230, 462, 60, 14, 0, 0, Math.PI * 2); g.fill();
-    drawCharacter(g, HERO, 230, 462, { scale: 1.5, pose: 'charge', t: this.t, aura: HERO.aura, super: Math.sin(this.t * 0.8) > 0 });
+    drawCharacter(g, HERO, 230, 462, { scale: 1.5, pose: 'charge', t: this.t, aura: Math.sin(this.t * 0.8) > 0 ? '#ffe14d' : HERO.aura, super: Math.sin(this.t * 0.8) > 0 });
     // Rival observando
     drawCharacter(g, LEVELS[3].enemy, 760, 462, { scale: 1.2, facing: -1, pose: 'idle', t: this.t });
 
@@ -162,7 +162,7 @@ const Game = {
     panel(g, W / 2 - 110, 280, 360, 124, { fill: 'rgba(12,10,36,0.78)' });
     const lines = IS_TOUCH
       ? ['Use os botões na tela', 'SOCO • KI • CARREGAR • ESPECIAL', 'Explore o mapa e entre no portal!']
-      : ['Setas/WASD: andar e pular', 'J: soco   K: rajada   L: carregar', 'I: especial   E/Enter: conversar', 'P: modo programador   M: som'];
+      : ['Setas: andar, pular e defender (← ou ↓)', 'J: soco   K: chute   L: carregar KI', 'U rajada  O teleporte  I onda  P esfera', 'TAB: modo programador   M: som'];
     lines.forEach((l, i) => text(g, l, W / 2 + 70, 308 + i * 26, { size: 16, color: '#e8e6ff', align: 'center' }));
 
     if (Math.sin(this.t * 5) > -0.2) {
@@ -186,7 +186,7 @@ const Game = {
     } else {
       text(g, 'QUASE LÁ!', W / 2, 210, { size: 84, color: '#ff8a80', align: 'center', font: FONT_TITLE, weight: '400', stroke: '#1b1030', lw: 12 });
       text(g, `${enemy.name} venceu desta vez. Tente de novo!`, W / 2, 262, { size: 22, color: '#fff', align: 'center' });
-      text(g, 'Dica: segure L para carregar e aperte I para o especial.', W / 2, 302, { size: 17, color: '#7ef9ff', align: 'center' });
+      text(g, 'Dica: segure ← para defender e faça combos com J e K!', W / 2, 302, { size: 17, color: '#7ef9ff', align: 'center' });
     }
     if (this.stateT > 0.8 && Math.sin(this.t * 6) > -0.3) {
       const label = won ? 'CONTINUAR' : 'TENTAR DE NOVO';
@@ -199,7 +199,7 @@ const Game = {
     drawArenaBg(g, LEVELS[0].theme, LEVELS[0].seed, this.t);
     g.fillStyle = 'rgba(5,3,15,0.25)';
     g.fillRect(0, 0, W, H);
-    drawCharacter(g, HERO, W / 2, 470, { scale: 1.4, pose: 'jump', t: this.t, aura: HERO.aura, super: true });
+    drawCharacter(g, HERO, W / 2, 470, { scale: 1.4, pose: 'win', t: this.t, aura: '#ffe14d', super: true });
     drawCharacter(g, MASTER, W / 2 - 220, 470, { scale: 1.1, pose: 'idle', t: this.t });
     FX.draw(g);
 

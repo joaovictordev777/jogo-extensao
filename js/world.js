@@ -569,7 +569,7 @@ const World = {
     if (!this.dialog) {
       const hint = IS_TOUCH
         ? 'Setas: andar  •  OK: conversar/lutar'
-        : 'Setas/WASD: andar  •  E/Espaço: conversar  •  P: modo programador  •  M: som';
+        : 'Setas/WASD: andar  •  E/Espaço: conversar  •  TAB: modo programador  •  M: som';
       g.font = `900 13px ${FONT_BODY}`;
       const w = g.measureText(hint).width + 28;
       panel(g, W / 2 - w / 2, H - 38, w, 28, { r: 14, fill: 'rgba(12,10,36,0.65)' });

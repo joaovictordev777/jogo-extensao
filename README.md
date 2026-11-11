@@ -11,14 +11,21 @@ Jogo de luta 2D estilo anime feito **100% com programação** (HTML + CSS + Java
 
 | Tecla | Ação |
 |---|---|
-| Setas / WASD | Andar (no mapa) · andar e pular (na luta, pulo duplo) |
-| J ou Espaço | Soco |
-| K | Rajada de energia (gasta KI) |
-| L (segurar) | Carregar energia (KI) |
-| I | Especial: Onda Estelar (KI cheio) |
+| Setas / WASD | Andar · ↑ pular (pulo duplo) |
+| Segurar ← (para trás) ou ↓ | **Defender** |
+| J ou Espaço | **Soco** (aperte 3x: jab, direto, gancho que arremessa) |
+| K | **Chute** (3x: baixo, alto, giratório; no ar: chute voador) |
+| J/K misturados | **Combos** (o contador "HITS!" aparece na tela) |
+| L (segurar) | Carregar KI · com KI cheio, continue segurando: **Modo Super** (cabelo dourado, +30% de força por 14s) |
+| U | Rajada de KI (8 de KI) |
+| O | Teleporte: some e ataca pelas costas (20 de KI) |
+| I | Onda Estelar: carrega na cintura e dispara (50 de KI); duas ondas se chocam! |
+| P | Esfera Solar gigante (100 de KI) |
 | E / Enter | Conversar · ler placa · entrar na arena |
-| **P** | **Modo Programador**: mostra caixas de colisão, posições, física e o que a IA está "pensando" |
+| **TAB** | **Modo Programador**: caixas de colisão, golpes, estados e o que a IA está "pensando" |
 | M | Liga/desliga o som |
+
+Os inimigos também defendem, desviam, fazem combos, se teleportam, usam a onda e, quando a vida cai pela metade, viram a **FORMA FINAL**. Para ajustar a dificuldade, mude `hp`, `dmg`, `think` e `skill` em `js/data.js`.
 
 No celular aparecem botões na tela (jogue com o celular deitado).
 

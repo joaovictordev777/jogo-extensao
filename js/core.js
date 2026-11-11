@@ -114,9 +114,10 @@ const KEYMAP = {
   ArrowUp: ['up'], KeyW: ['up'],
   ArrowDown: ['down'], KeyS: ['down'],
   KeyJ: ['punch'], Space: ['punch', 'confirm'],
-  KeyK: ['blast'], KeyL: ['charge'], KeyI: ['special'],
+  KeyK: ['kick'], KeyL: ['charge'],
+  KeyU: ['blast'], KeyI: ['beam'], KeyO: ['teleport'], KeyP: ['sphere'],
   Enter: ['confirm'], KeyE: ['confirm'],
-  KeyP: ['debug'], KeyM: ['mute'],
+  Tab: ['debug'], F2: ['debug'], KeyM: ['mute'],
 };
 
 const Input = {
@@ -252,6 +253,13 @@ const Sound = {
       case 'portal': this.tone(180, 0.6, { type: 'sine', to: 900, vol: 0.14 }); break;
       case 'splash': this.noise(0.25, 0.18); this.tone(500, 0.2, { type: 'sine', to: 150, vol: 0.1 }); break;
       case 'alert': this.tone(880, 0.1, { vol: 0.1 }); this.tone(1175, 0.18, { vol: 0.1, delay: 0.1 }); break;
+      case 'whoosh': this.noise(0.09, 0.08); this.tone(260, 0.09, { type: 'triangle', to: 120, vol: 0.05 }); break;
+      case 'heavy': this.noise(0.25, 0.4); this.tone(110, 0.3, { type: 'sawtooth', to: 40, vol: 0.18 }); break;
+      case 'block': this.tone(1200, 0.06, { type: 'square', vol: 0.06 }); this.noise(0.05, 0.12); break;
+      case 'teleport': this.tone(1400, 0.12, { type: 'sine', to: 300, vol: 0.12 }); this.tone(300, 0.12, { type: 'sine', to: 1400, vol: 0.08, delay: 0.1 }); break;
+      case 'sphere': this.tone(90, 1.3, { type: 'sawtooth', to: 360, vol: 0.08 }); this.tone(180, 1.3, { type: 'sine', to: 720, vol: 0.06 }); break;
+      case 'boom': this.noise(0.6, 0.45); this.tone(80, 0.6, { type: 'sawtooth', to: 30, vol: 0.2 }); break;
+      case 'transform': this.tone(150, 0.9, { type: 'sawtooth', to: 900, vol: 0.1 }); this.noise(0.8, 0.2); break;
       case 'clash': this.noise(0.25, 0.25); this.tone(900, 0.2, { type: 'square', to: 300, vol: 0.06 }); break;
       default: break;
     }
@@ -262,9 +270,31 @@ const Sound = {
 const FX = {
   parts: [],
   pops: [],
+  rings: [],
+  streaks: [],
   shake: 0,
 
-  clear() { this.parts.length = 0; this.pops.length = 0; this.shake = 0; },
+  clear() { this.parts.length = 0; this.pops.length = 0; this.rings.length = 0; this.streaks.length = 0; this.shake = 0; },
+
+  ring(x, y, color = '#ffffff', maxR = 60, life = 0.3) {
+    this.rings.push({ x, y, color, maxR, life, max: life });
+  },
+
+  sparks(x, y, dir, color = '#ffffff', n = 6, len = 40) {
+    for (let i = 0; i < n; i++) {
+      const a = (dir > 0 ? 0 : Math.PI) + rand(-0.9, 0.9);
+      this.streaks.push({ x, y, a, v: rand(500, 900), len: len * rand(0.6, 1.2), life: 0.16, max: 0.16, color });
+    }
+  },
+
+  dust(x, y, n = 8) {
+    for (let i = 0; i < n; i++) {
+      this.parts.push({
+        x: x + rand(-20, 20), y, vx: rand(-120, 120), vy: rand(-80, -20),
+        life: 0.5, max: 0.5, color: 'rgba(230,220,200,0.8)', size: rand(4, 8), gravity: 60,
+      });
+    }
+  },
 
   burst(x, y, color, n = 14, speed = 260, size = 4, gravity = 300) {
     for (let i = 0; i < n; i++) {
@@ -301,6 +331,10 @@ const FX = {
       if (p.rot !== undefined) p.rot += dt * 5;
     }
     this.parts = this.parts.filter((p) => p.life > 0);
+    for (const r of this.rings) r.life -= dt;
+    this.rings = this.rings.filter((r) => r.life > 0);
+    for (const k of this.streaks) { k.life -= dt; k.x += Math.cos(k.a) * k.v * dt; k.y += Math.sin(k.a) * k.v * dt; }
+    this.streaks = this.streaks.filter((k) => k.life > 0);
     for (const p of this.pops) { p.life -= dt; p.y -= 40 * dt; }
     this.pops = this.pops.filter((p) => p.life > 0);
   },
@@ -320,6 +354,24 @@ const FX = {
         g.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         g.fill();
       }
+    }
+    g.globalAlpha = 1;
+    g.lineCap = 'round';
+    for (const r of this.rings) {
+      const k = 1 - r.life / r.max;
+      g.globalAlpha = 1 - k;
+      g.strokeStyle = r.color;
+      g.lineWidth = 6 * (1 - k) + 1;
+      g.beginPath(); g.arc(r.x, r.y, r.maxR * (0.2 + k * 0.8), 0, Math.PI * 2); g.stroke();
+    }
+    for (const k of this.streaks) {
+      g.globalAlpha = k.life / k.max;
+      g.strokeStyle = k.color;
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(k.x, k.y);
+      g.lineTo(k.x - Math.cos(k.a) * k.len, k.y - Math.sin(k.a) * k.len);
+      g.stroke();
     }
     g.globalAlpha = 1;
     for (const p of this.pops) {
